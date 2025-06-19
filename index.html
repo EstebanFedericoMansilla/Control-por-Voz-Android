@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control por Voz Android</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .recording {
+            background-color: #ef4444 !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <nav class="bg-gray-800 p-4">
+        <div class="container mx-auto">
+            <h1 class="text-2xl font-bold text-center">Control por Voz Android</h1>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 py-8">
+        <!-- Sección Principal -->
+        <div class="text-center mb-12">
+            <button id="startButton" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-full text-xl font-bold pulse mb-4">
+                🎤 Presiona para Hablar
+            </button>
+            <p id="result" class="text-lg text-gray-300">Esperando comando...</p>
+        </div>
+
+        <!-- Lista de Comandos -->
+        <div class="max-w-2xl mx-auto">
+            <h2 class="text-xl font-bold mb-4">Comandos Disponibles:</h2>
+            
+            <div class="bg-gray-800 p-6 rounded-xl mb-6">
+                <h3 class="font-bold mb-2">Abrir Apps</h3>
+                <ul class="space-y-2 text-gray-300">
+                    <li>• "Abrir WhatsApp"</li>
+                    <li>• "Abrir Teléfono"</li>
+                    <li>• "Abrir Mensajes"</li>
+                    <li>• "Abrir YouTube"</li>
+                    <li>• "Abrir Maps"</li>
+                    <li>• "Abrir Facebook"</li>
+                    <li>• "Abrir Instagram"</li>
+                    <li>• "Abrir TikTok"</li>
+                </ul>
+            </div>
+
+            <div class="bg-gray-800 p-6 rounded-xl mb-6">
+                <h3 class="font-bold mb-2">Acciones Rápidas</h3>
+                <ul class="space-y-2 text-gray-300">
+                    <li>• "Llamar a [número]"</li>
+                    <li>• "WhatsApp a [número]"</li>
+                    <li>• "Buscar en Maps [lugar]"</li>
+                    <li>• "Buscar en YouTube [término]"</li>
+                </ul>
+            </div>
+
+            <div class="bg-gray-800 p-6 rounded-xl">
+                <h3 class="font-bold mb-2">Enlaces Directos</h3>
+                <ul class="space-y-2 text-gray-300">
+                    <li>• "Email a [dirección]"</li>
+                    <li>• "Navegar a [dirección]"</li>
+                    <li>• "Compartir ubicación"</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let recognition;
+        const startButton = document.getElementById('startButton');
+        const resultDiv = document.getElementById('result');
+
+        // Configurar reconocimiento de voz
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'es-ES';
+
+            recognition.onstart = function() {
+                startButton.classList.add('recording');
+                startButton.textContent = '🎤 Escuchando...';
+            };
+
+            recognition.onend = function() {
+                startButton.classList.remove('recording');
+                startButton.textContent = '🎤 Presiona para Hablar';
+            };
+
+            recognition.onresult = function(event) {
+                const command = event.results[0][0].transcript.toLowerCase();
+                resultDiv.textContent = 'Comando reconocido: ' + command;
+                processCommand(command);
+            };
+
+            recognition.onerror = function(event) {
+                resultDiv.textContent = 'Error: ' + event.error;
+                startButton.classList.remove('recording');
+                startButton.textContent = '🎤 Presiona para Hablar';
+            };
+        } else {
+            resultDiv.textContent = 'Tu navegador no soporta reconocimiento de voz';
+            startButton.disabled = true;
+        }
+
+        // Manejar botón de inicio
+        startButton.addEventListener('click', function() {
+            if (recognition) {
+                recognition.start();
+            }
+        });
+
+        // Procesar comandos
+        function processCommand(command) {
+            // Apps básicas
+            const apps = {
+                'whatsapp': 'whatsapp://',
+                'teléfono': 'tel:',
+                'mensajes': 'sms:',
+                'youtube': 'https://youtube.com',
+                'maps': 'https://maps.google.com',
+                'facebook': 'fb://',
+                'instagram': 'instagram://',
+                'twitter': 'twitter://',
+                'tiktok': 'tiktok://'
+            };
+
+            // Buscar comandos de apertura de apps
+            for (let app in apps) {
+                if (command.includes('abrir ' + app)) {
+                    openApp(apps[app], app);
+                    return;
+                }
+            }
+
+            // Comandos específicos
+            if (command.includes('llamar a')) {
+                const number = command.split('llamar a')[1].trim();
+                window.location.href = 'tel:' + number;
+                return;
+            }
+
+            if (command.includes('whatsapp a')) {
+                const number = command.split('whatsapp a')[1].trim();
+                window.location.href = 'whatsapp://send?phone=' + number;
+                return;
+            }
+
+            if (command.includes('buscar en youtube')) {
+                const search = command.split('buscar en youtube')[1].trim();
+                window.location.href = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(search);
+                return;
+            }
+
+            if (command.includes('buscar en maps')) {
+                const place = command.split('buscar en maps')[1].trim();
+                window.location.href = 'https://www.google.com/maps/search/' + encodeURIComponent(place);
+                return;
+            }
+
+            if (command.includes('email a')) {
+                const email = command.split('email a')[1].trim();
+                window.location.href = 'mailto:' + email;
+                return;
+            }
+
+            if (command.includes('compartir ubicación')) {
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(function(position) {
+                        const latitude = position.coords.latitude;
+                        const longitude = position.coords.longitude;
+                        window.location.href = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                    });
+                    return;
+                }
+            }
+
+            // Si el comando no coincide
+            resultDiv.textContent = 'Comando no reconocido: ' + command;
+        }
+
+        // Abrir aplicación
+        function openApp(url, appName) {
+            resultDiv.textContent = 'Abriendo ' + appName + '...';
+            window.location.href = url;
+        }
+    </script>
+</body>
+</html>
