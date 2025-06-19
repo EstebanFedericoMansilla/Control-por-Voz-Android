@@ -33,6 +33,7 @@
                 🎤 Presiona para Hablar
             </button>
             <p id="result" class="text-lg text-gray-300">Esperando comando...</p>
+            <p id="status" class="text-sm text-gray-400 mt-2"></p>
         </div>
 
         <!-- Lista de Comandos -->
@@ -50,6 +51,8 @@
                     <li>• "Abrir Facebook"</li>
                     <li>• "Abrir Instagram"</li>
                     <li>• "Abrir TikTok"</li>
+                    <li>• "Abrir Gmail"</li>
+                    <li>• "Abrir Spotify"</li>
                 </ul>
             </div>
 
@@ -60,6 +63,7 @@
                     <li>• "WhatsApp a [número]"</li>
                     <li>• "Buscar en Maps [lugar]"</li>
                     <li>• "Buscar en YouTube [término]"</li>
+                    <li>• "Enviar mensaje a [número]"</li>
                 </ul>
             </div>
 
@@ -78,16 +82,25 @@
         let recognition;
         const startButton = document.getElementById('startButton');
         const resultDiv = document.getElementById('result');
+        const statusDiv = document.getElementById('status');
+
+        // Detectar plataforma
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+        statusDiv.textContent = `Plataforma detectada: ${isAndroid ? 'Android' : isIOS ? 'iOS' : 'Escritorio'}`;
 
         // Configurar reconocimiento de voz
-        if ('webkitSpeechRecognition' in window) {
-            recognition = new webkitSpeechRecognition();
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
             recognition.continuous = false;
             recognition.lang = 'es-ES';
+            recognition.interimResults = false;
 
             recognition.onstart = function() {
                 startButton.classList.add('recording');
                 startButton.textContent = '🎤 Escuchando...';
+                resultDiv.textContent = 'Escuchando tu comando...';
             };
 
             recognition.onend = function() {
@@ -97,7 +110,7 @@
 
             recognition.onresult = function(event) {
                 const command = event.results[0][0].transcript.toLowerCase();
-                resultDiv.textContent = 'Comando reconocido: ' + command;
+                resultDiv.textContent = 'Comando reconocido: "' + command + '"';
                 processCommand(command);
             };
 
@@ -118,57 +131,158 @@
             }
         });
 
+        // Función mejorada para abrir aplicaciones
+        function tryOpenApp(appSchemes, fallbackUrl, appName) {
+            let attempted = false;
+            
+            // Intentar con cada esquema de URL
+            for (let scheme of appSchemes) {
+                if (!attempted) {
+                    attempted = true;
+                    
+                    // Crear un iframe oculto para intentar abrir la app
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = scheme;
+                    document.body.appendChild(iframe);
+                    
+                    // Remover el iframe después de un tiempo
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                    }, 1000);
+                    
+                    // Si después de 2 segundos no se abrió la app, usar fallback
+                    setTimeout(() => {
+                        if (document.hasFocus()) {
+                            // Si el documento aún tiene foco, la app no se abrió
+                            window.open(fallbackUrl, '_blank');
+                            resultDiv.textContent = `Abriendo ${appName} en navegador...`;
+                        }
+                    }, 2000);
+                    
+                    resultDiv.textContent = `Intentando abrir ${appName}...`;
+                    break;
+                }
+            }
+        }
+
         // Procesar comandos
         function processCommand(command) {
-            // Apps básicas
+            // Definir aplicaciones con múltiples esquemas y fallbacks
             const apps = {
-                'whatsapp': 'whatsapp://',
-                'teléfono': 'tel:',
-                'mensajes': 'sms:',
-                'youtube': 'https://youtube.com',
-                'maps': 'https://maps.google.com',
-                'facebook': 'fb://',
-                'instagram': 'instagram://',
-                'twitter': 'twitter://',
-                'tiktok': 'tiktok://'
+                'whatsapp': {
+                    schemes: ['whatsapp://', 'https://wa.me/'],
+                    fallback: 'https://web.whatsapp.com/',
+                    name: 'WhatsApp'
+                },
+                'teléfono': {
+                    schemes: ['tel:'],
+                    fallback: 'tel:',
+                    name: 'Teléfono'
+                },
+                'mensajes': {
+                    schemes: ['sms:', 'mms:'],
+                    fallback: 'sms:',
+                    name: 'Mensajes'
+                },
+                'youtube': {
+                    schemes: ['youtube://', 'vnd.youtube://'],
+                    fallback: 'https://youtube.com',
+                    name: 'YouTube'
+                },
+                'maps': {
+                    schemes: ['geo:', 'google.navigation://'],
+                    fallback: 'https://maps.google.com',
+                    name: 'Maps'
+                },
+                'facebook': {
+                    schemes: ['fb://', 'facebook://'],
+                    fallback: 'https://facebook.com',
+                    name: 'Facebook'
+                },
+                'instagram': {
+                    schemes: ['instagram://', 'https://instagram.com/_u/'],
+                    fallback: 'https://instagram.com',
+                    name: 'Instagram'
+                },
+                'tiktok': {
+                    schemes: ['tiktok://', 'snssdk1233://'],
+                    fallback: 'https://tiktok.com',
+                    name: 'TikTok'
+                },
+                'gmail': {
+                    schemes: ['googlegmail://', 'mailto:'],
+                    fallback: 'https://gmail.com',
+                    name: 'Gmail'
+                },
+                'spotify': {
+                    schemes: ['spotify://', 'https://open.spotify.com/'],
+                    fallback: 'https://open.spotify.com',
+                    name: 'Spotify'
+                }
             };
 
             // Buscar comandos de apertura de apps
             for (let app in apps) {
                 if (command.includes('abrir ' + app)) {
-                    openApp(apps[app], app);
+                    const appData = apps[app];
+                    tryOpenApp(appData.schemes, appData.fallback, appData.name);
                     return;
                 }
             }
 
-            // Comandos específicos
+            // Comandos específicos mejorados
             if (command.includes('llamar a')) {
-                const number = command.split('llamar a')[1].trim();
-                window.location.href = 'tel:' + number;
+                const number = command.split('llamar a')[1].trim().replace(/\s/g, '');
+                const telUrl = 'tel:' + number;
+                window.location.href = telUrl;
+                resultDiv.textContent = `Llamando a ${number}...`;
                 return;
             }
 
             if (command.includes('whatsapp a')) {
-                const number = command.split('whatsapp a')[1].trim();
-                window.location.href = 'whatsapp://send?phone=' + number;
+                const number = command.split('whatsapp a')[1].trim().replace(/\s/g, '');
+                const whatsappSchemes = [
+                    `whatsapp://send?phone=${number}`,
+                    `https://wa.me/${number}`
+                ];
+                tryOpenApp(whatsappSchemes, `https://web.whatsapp.com/send?phone=${number}`, 'WhatsApp');
+                return;
+            }
+
+            if (command.includes('enviar mensaje a')) {
+                const number = command.split('enviar mensaje a')[1].trim().replace(/\s/g, '');
+                const smsUrl = 'sms:' + number;
+                window.location.href = smsUrl;
+                resultDiv.textContent = `Abriendo mensajes para ${number}...`;
                 return;
             }
 
             if (command.includes('buscar en youtube')) {
                 const search = command.split('buscar en youtube')[1].trim();
-                window.location.href = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(search);
+                const youtubeSchemes = [
+                    `youtube://results?search_query=${encodeURIComponent(search)}`,
+                    `vnd.youtube://results?search_query=${encodeURIComponent(search)}`
+                ];
+                tryOpenApp(youtubeSchemes, `https://www.youtube.com/results?search_query=${encodeURIComponent(search)}`, 'YouTube');
                 return;
             }
 
             if (command.includes('buscar en maps')) {
                 const place = command.split('buscar en maps')[1].trim();
-                window.location.href = 'https://www.google.com/maps/search/' + encodeURIComponent(place);
+                const mapsSchemes = [
+                    `geo:0,0?q=${encodeURIComponent(place)}`,
+                    `google.navigation:q=${encodeURIComponent(place)}`
+                ];
+                tryOpenApp(mapsSchemes, `https://www.google.com/maps/search/${encodeURIComponent(place)}`, 'Maps');
                 return;
             }
 
             if (command.includes('email a')) {
                 const email = command.split('email a')[1].trim();
-                window.location.href = 'mailto:' + email;
+                const mailtoUrl = 'mailto:' + email;
+                window.location.href = mailtoUrl;
+                resultDiv.textContent = `Abriendo email para ${email}...`;
                 return;
             }
 
@@ -177,21 +291,30 @@
                     navigator.geolocation.getCurrentPosition(function(position) {
                         const latitude = position.coords.latitude;
                         const longitude = position.coords.longitude;
-                        window.location.href = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                        const locationUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                        window.open(locationUrl, '_blank');
+                        resultDiv.textContent = 'Compartiendo ubicación...';
+                    }, function(error) {
+                        resultDiv.textContent = 'Error al obtener ubicación: ' + error.message;
                     });
-                    return;
+                } else {
+                    resultDiv.textContent = 'Geolocalización no disponible';
                 }
+                return;
             }
 
             // Si el comando no coincide
-            resultDiv.textContent = 'Comando no reconocido: ' + command;
+            resultDiv.textContent = 'Comando no reconocido: "' + command + '"';
         }
 
-        // Abrir aplicación
-        function openApp(url, appName) {
-            resultDiv.textContent = 'Abriendo ' + appName + '...';
-            window.location.href = url;
-        }
+        // Detectar si el usuario regresa a la página (útil para saber si la app se abrió)
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                // El usuario regresó a la página
+                console.log('Usuario regresó a la página');
+            }
+        });
     </script>
 </body>
 </html>
+</qodoArtifact>
